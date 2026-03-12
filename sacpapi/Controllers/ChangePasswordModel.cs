@@ -1,0 +1,8 @@
+﻿namespace sacpapi.Controllers
+{
+    public class ChangePasswordModel
+    {
+        public required string OldPassword { get; set; }
+        public required string NewPassword { get; set; }
+    }
+}
