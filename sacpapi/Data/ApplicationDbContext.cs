@@ -85,6 +85,15 @@ namespace sacpapi.Data
             modelBuilder.Entity<StakeParticipant>()
            .ToTable("tblStakeParticipants");
 
+            modelBuilder.Entity<Participants>(entity =>
+            {
+                // 1. Map to the correct table name seen in your screenshot
+                entity.ToTable("tblParticipants");
+
+                // 2. Tell EF Core about the trigger to stop the "OUTPUT clause" error
+                entity.ToTable(tb => tb.HasTrigger("trg_CleanParticipantIDs"));
+            });
+
             modelBuilder.Entity<AWPActivity>(entity =>
             {
                 entity.HasKey(e => e.Id);

@@ -6,7 +6,7 @@ namespace sacpapi.Models
     {
         [Key]
         public int Id { get; set; }
-        public string ?Gtid { get; set; }
+        public string? Gtid { get; set; }
         public string? NameOfParticipant { get; set; }
         public string? Sex { get; set; }   // "M" or "F"
         public string? Organisation { get; set; }

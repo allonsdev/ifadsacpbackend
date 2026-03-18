@@ -4,6 +4,7 @@ using OfficeOpenXml;
 using sacpapi.Data;
 using sacpapi.Data.Services;
 using sacpapi.Models;
+using System.Reflection;
 
 namespace sacpapi.Controllers
 {
@@ -184,116 +185,116 @@ namespace sacpapi.Controllers
             return Json(existingNationalIDs);
         }
 
-        [HttpPost("stakeholdertemplate/save-data/{generalActivityId}")]
-        public async Task<IActionResult> SaveStakeholderData(
-    [FromBody] List<StakeholderParticipants> participants,
-    [FromRoute] string generalActivityId)
-        {
-            if (participants == null || participants.Count == 0)
-                return BadRequest("No participant data provided");
+    //    [HttpPost("stakeholdertemplate/save-data/{generalActivityId}")]
+    //    public async Task<IActionResult> SaveStakeholderData(
+    //[FromBody] List<StakeholderParticipants> participants,
+    //[FromRoute] string generalActivityId)
+    //    {
+    //        if (participants == null || participants.Count == 0)
+    //            return BadRequest("No participant data provided");
 
-            var createdList = new List<object>();
-            var updatedList = new List<object>();
-            var failedList = new List<object>();
+    //        var createdList = new List<object>();
+    //        var updatedList = new List<object>();
+    //        var failedList = new List<object>();
 
-            foreach (var (p, index) in participants.Select((p, i) => (p, i)))
-            {
-                try
-                {
-                    // Force GTID + uploader from route
-                    p.Gtid = generalActivityId;
+    //        foreach (var (p, index) in participants.Select((p, i) => (p, i)))
+    //        {
+    //            try
+    //            {
+    //                // Force GTID + uploader from route
+    //                p.Gtid = generalActivityId;
                     
-                    p.UploadedDate = DateTime.Now;
+    //                p.UploadedDate = DateTime.Now;
 
-                    if (string.IsNullOrWhiteSpace(p.NameOfParticipant) ||
-                        string.IsNullOrWhiteSpace(p.Organisation) ||
-                        string.IsNullOrWhiteSpace(p.ContactNumber) ||
-                        string.IsNullOrWhiteSpace(p.EmailAddress))
-                    {
-                        failedList.Add(new { Row = index + 2, Reason = "Missing required fields" });
-                        continue;
-                    }
+    //                if (string.IsNullOrWhiteSpace(p.NameOfParticipant) ||
+    //                    string.IsNullOrWhiteSpace(p.Organisation) ||
+    //                    string.IsNullOrWhiteSpace(p.ContactNumber) ||
+    //                    string.IsNullOrWhiteSpace(p.EmailAddress))
+    //                {
+    //                    failedList.Add(new { Row = index + 2, Reason = "Missing required fields" });
+    //                    continue;
+    //                }
 
-                    var existing = await _context.StakeholderParticipants.FirstOrDefaultAsync(x =>
-                        x.Gtid == p.Gtid &&
-                        x.Organisation == p.Organisation &&
-                        x.NameOfParticipant == p.NameOfParticipant &&
-                        x.EmailAddress == p.EmailAddress &&
-                        x.ContactNumber == p.ContactNumber
-                    );
+    //                var existing = await _context.StakeholderParticipants.FirstOrDefaultAsync(x =>
+    //                    x.Gtid == p.Gtid &&
+    //                    x.Organisation == p.Organisation &&
+    //                    x.NameOfParticipant == p.NameOfParticipant &&
+    //                    x.EmailAddress == p.EmailAddress &&
+    //                    x.ContactNumber == p.ContactNumber
+    //                );
 
-                    if (existing != null)
-                    {
-                        existing.Sex = p.Sex;
-                        existing.Position = p.Position;
+    //                if (existing != null)
+    //                {
+    //                    existing.Sex = p.Sex;
+    //                    existing.Position = p.Position;
                        
-                        existing.UploadedDate = DateTime.Now;
+    //                    existing.UploadedDate = DateTime.Now;
 
-                        updatedList.Add(new
-                        {
-                            Action = "Updated Duplicate",
-                            ParticipantId = existing.Id,
-                            Name = existing.NameOfParticipant
-                        });
+    //                    updatedList.Add(new
+    //                    {
+    //                        Action = "Updated Duplicate",
+    //                        ParticipantId = existing.Id,
+    //                        Name = existing.NameOfParticipant
+    //                    });
 
-                        continue;
-                    }
+    //                    continue;
+    //                }
 
-                    _context.StakeholderParticipants.Add(p);
-                    await _context.SaveChangesAsync();
+    //                _context.StakeholderParticipants.Add(p);
+    //                await _context.SaveChangesAsync();
 
-                    createdList.Add(new
-                    {
-                        Action = "Created",
-                        ParticipantId = p.Id,
-                        Name = p.NameOfParticipant
-                    });
-                }
-                catch (Exception ex)
-                {
-                    failedList.Add(new { Row = index + 2, Reason = ex.Message });
-                }
-            }
+    //                createdList.Add(new
+    //                {
+    //                    Action = "Created",
+    //                    ParticipantId = p.Id,
+    //                    Name = p.NameOfParticipant
+    //                });
+    //            }
+    //            catch (Exception ex)
+    //            {
+    //                failedList.Add(new { Row = index + 2, Reason = ex.Message });
+    //            }
+    //        }
 
-            return Ok(new
-            {
-                Created = createdList,
-                UpdatedDuplicates = updatedList,
-                Failed = failedList
-            });
-        }
+    //        return Ok(new
+    //        {
+    //            Created = createdList,
+    //            UpdatedDuplicates = updatedList,
+    //            Failed = failedList
+    //        });
+    //    }
 
 
-        [HttpPost("stakeholdertemplate/upload-file/{generalActivityId}")]
-        public async Task<IActionResult> UploadStakeholderExcel(
-            [FromForm] IFormFile file,
-            [FromRoute] string generalActivityId)
-        {
-            if (file == null || file.Length == 0)
-                return BadRequest("Please upload a valid Excel file");
+    //    [HttpPost("stakeholdertemplate/upload-file/{generalActivityId}")]
+    //    public async Task<IActionResult> UploadStakeholderExcel(
+    //        [FromForm] IFormFile file,
+    //        [FromRoute] string generalActivityId)
+    //    {
+    //        if (file == null || file.Length == 0)
+    //            return BadRequest("Please upload a valid Excel file");
 
-            var uploadsPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "Uploads",
-                "StakeholderExcel",
-                generalActivityId);
+    //        var uploadsPath = Path.Combine(
+    //            Directory.GetCurrentDirectory(),
+    //            "Uploads",
+    //            "StakeholderExcel",
+    //            generalActivityId);
 
-            Directory.CreateDirectory(uploadsPath);
+    //        Directory.CreateDirectory(uploadsPath);
 
-            var fileName = $"{DateTime.Now:yyyyMMddHHmmss}_{file.FileName}";
-            var filePath = Path.Combine(uploadsPath, fileName);
+    //        var fileName = $"{DateTime.Now:yyyyMMddHHmmss}_{file.FileName}";
+    //        var filePath = Path.Combine(uploadsPath, fileName);
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
+    //        using (var stream = new FileStream(filePath, FileMode.Create))
+    //        {
+    //            await file.CopyToAsync(stream);
+    //        }
 
-            return Ok(new
-            {
-                Message = "File uploaded successfully",
-                FileName = fileName
-            });
-        }
+    //        return Ok(new
+    //        {
+    //            Message = "File uploaded successfully",
+    //            FileName = fileName
+    //        });
+    //    }
 
 
 
@@ -533,16 +534,17 @@ namespace sacpapi.Controllers
                             // ----------------------------
                             if (!string.IsNullOrWhiteSpace(gender))
                             {
-                                gender = gender.ToUpper();
-                                if (gender == "M") gender = "Male";
-                                if (gender == "F") gender = "Female";
-                                if (gender == "MALEALE") gender = "Male";
-                                if (gender == "FEMALES") gender = "Female";
+                                var normalizedGender = gender.Trim().ToLower();
 
-                                if (gender != "Male" && gender != "Female")
+                                // Map various inputs to standard values
+                                if (normalizedGender == "m" || normalizedGender == "male" || normalizedGender == "maleale")
+                                    gender = "Male";
+                                else if (normalizedGender == "f" || normalizedGender == "female" || normalizedGender == "females")
+                                    gender = "Female";
+                                else
                                 {
                                     failedCount++;
-                                    results.Add(new { Row = row, Status = "Failed", Reason = "Invalid Gender" });
+                                    results.Add(new { Row = row, Status = "Failed", Reason = "Invalid Gender - must be Male or Female" });
                                     continue;
                                 }
                             }
@@ -681,6 +683,7 @@ namespace sacpapi.Controllers
                 return StatusCode(500, $"Unexpected error occurred: {ex.Message}");
             }
         }
+
         [HttpPost("Upload")]
         public async Task<IActionResult> UploadFile([FromForm] Template model)
         {
@@ -721,6 +724,174 @@ namespace sacpapi.Controllers
                 return BadRequest(ex);
             }
 
+        }
+
+
+
+        [HttpPost("UploadStakeholderTemplate/{gtid}")]
+        public async Task<IActionResult> UploadStakeholderTemplate(IFormFile file, string gtid)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedStakeholderTemplates");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            var results = new List<object>();
+            int successCount = 0;
+            int failedCount = 0;
+
+            try
+            {
+                // Save the uploaded file
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var stakeholders = new List<StakeholderParticipants>();
+
+                ExcelPackage.License.SetNonCommercialPersonal("Cusper Shongera"); // your license name
+                using (var package = new ExcelPackage(new FileInfo(filePath)))
+                {
+                    var worksheet = package.Workbook.Worksheets.FirstOrDefault();
+                    if (worksheet == null)
+                        return BadRequest("Excel file does not contain any worksheet.");
+
+                    var rowCount = worksheet.Dimension.Rows;
+
+                    // Expected headers: NameOfParticipant, Sex, Organisation, Position, ContactNumber, EmailAddress
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        try
+                        {
+                            string nameOfParticipant = worksheet.Cells[row, 1].Text?.Trim();
+                            string sex = worksheet.Cells[row, 2].Text?.Trim();
+                            string organisation = worksheet.Cells[row, 3].Text?.Trim();
+                            string position = worksheet.Cells[row, 4].Text?.Trim();
+                            string contactNumber = worksheet.Cells[row, 5].Text?.Trim();
+                            string emailAddress = worksheet.Cells[row, 6].Text?.Trim();
+
+                            // ----------------------------
+                            // REQUIRED FIELDS CHECK
+                            // ----------------------------
+                            if (string.IsNullOrWhiteSpace(nameOfParticipant))
+                            {
+                                failedCount++;
+                                results.Add(new { Row = row, Status = "Failed", Reason = "Name of Participant is required" });
+                                continue;
+                            }
+
+                            // ----------------------------
+                            // SEX VALIDATION (M or F)
+                            // ----------------------------
+                            if (!string.IsNullOrWhiteSpace(sex))
+                            {
+                                var normalizedSex = sex.Trim().ToLower();
+
+                                // Map various inputs to standard values
+                                if (normalizedSex == "m" || normalizedSex == "male" || normalizedSex == "maleale")
+                                    sex = "Male";
+                                else if (normalizedSex == "f" || normalizedSex == "female" || normalizedSex == "females")
+                                    sex = "Female";
+                                else
+                                {
+                                    failedCount++;
+                                    results.Add(new { Row = row, Status = "Failed", Reason = "Invalid Gender - must be Male or Female" });
+                                    continue;
+                                }
+                            }
+
+                            // ----------------------------
+                            // CONTACT NUMBER VALIDATION (optional but must be digits if provided)
+                            // ----------------------------
+                            if (!string.IsNullOrWhiteSpace(contactNumber) &&
+                                !contactNumber.All(char.IsDigit))
+                            {
+                                failedCount++;
+                                results.Add(new { Row = row, Status = "Failed", Reason = "Invalid Contact Number - must contain only digits" });
+                                continue;
+                            }
+
+                            // ----------------------------
+                            // EMAIL VALIDATION (optional but must be valid format if provided)
+                            // ----------------------------
+                            if (!string.IsNullOrWhiteSpace(emailAddress))
+                            {
+                                try
+                                {
+                                    var addr = new System.Net.Mail.MailAddress(emailAddress);
+                                    if (addr.Address != emailAddress)
+                                    {
+                                        failedCount++;
+                                        results.Add(new { Row = row, Status = "Failed", Reason = "Invalid Email Address format" });
+                                        continue;
+                                    }
+                                }
+                                catch
+                                {
+                                    failedCount++;
+                                    results.Add(new { Row = row, Status = "Failed", Reason = "Invalid Email Address format" });
+                                    continue;
+                                }
+                            }
+
+                            // ----------------------------
+                            // CREATE STAKEHOLDER RECORD
+                            // ----------------------------
+                            stakeholders.Add(new StakeholderParticipants
+                            {
+                                Gtid = gtid,
+                                NameOfParticipant = nameOfParticipant,
+                                Sex = sex,
+                                Organisation = organisation,
+                                Position = position,
+                                ContactNumber = contactNumber,
+                                EmailAddress = emailAddress,
+                                UploadedBy = User.Identity?.Name ?? "Anonymous"
+                            });
+
+                            successCount++;
+                            results.Add(new { Row = row, Status = "Success" });
+                        }
+                        catch (Exception rowEx)
+                        {
+                            failedCount++;
+                            results.Add(new { Row = row, Status = "Failed", Reason = rowEx.Message });
+                        }
+                    }
+                }
+
+                // ----------------------------
+                // ADD NEW STAKEHOLDERS TO DATABASE
+                // ----------------------------
+                if (stakeholders.Any())
+                {
+                    await _context.StakeholderParticipants.AddRangeAsync(stakeholders);
+                    await _context.SaveChangesAsync();
+                }
+
+                return Ok(new
+                {
+                    message = "Stakeholder import completed.",
+                    totalSuccess = successCount,
+                    totalFailed = failedCount,
+                    results
+                });
+            }
+            catch (DbUpdateException dbEx)
+            {
+                var message = dbEx.InnerException?.Message ?? dbEx.Message;
+                return StatusCode(500, $"Database validation failed: {message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Unexpected error occurred: {ex.Message}");
+            }
         }
 
     }
