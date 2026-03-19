@@ -69,46 +69,38 @@ namespace sacpapi.Controllers
             using (var connection = new SqlConnection(connectionString))
             {
                 connection.Open();
-
                 dynamic jsonData = data;
+
+                // ← pull out the PK name and remove it from the data
+                string primaryKey = data["__primaryKey"]?.ToString() ?? "";
+                data.Remove("__primaryKey");
 
                 var columns = new List<string>();
                 var values = new List<string>();
 
                 foreach (var property in jsonData.Properties())
                 {
+                    // ← skip the identity column
+                    if (property.Name == primaryKey) continue;
+
                     columns.Add(property.Name);
 
                     if (property.Value.Type == JTokenType.String)
-                    {
                         values.Add($"'{property.Value}'");
-                    }
                     else if (property.Value.Type == JTokenType.Integer || property.Value.Type == JTokenType.Float)
-                    {
                         values.Add(property.Value.ToString());
-                    }
                     else if (property.Value.Type == JTokenType.Null)
-                    {
                         values.Add("NULL");
-                    }
                 }
 
                 string columnsStr = string.Join(", ", columns);
                 string valuesStr = string.Join(", ", values);
-
                 string sql = $"INSERT INTO {tablename} ({columnsStr}) VALUES ({valuesStr})";
 
                 using (var command = new SqlCommand(sql, connection))
                 {
                     int rowsAffected = command.ExecuteNonQuery();
-                    if (rowsAffected > 0)
-                    {
-                        return StatusCode(200);
-                    }
-                    else
-                    {
-                        return StatusCode(500);
-                    }
+                    return rowsAffected > 0 ? StatusCode(200) : StatusCode(500);
                 }
             }
         }
@@ -179,6 +171,54 @@ namespace sacpapi.Controllers
                         }
                        
                     }
+                }
+            }
+        }
+
+        [Route("{tablename}/update")]
+        [HttpPost]
+        public IActionResult UpdateParameter(string tablename, [FromBody] JObject data)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                if (data == null)
+                {
+                    return BadRequest("Invalid request body");
+                }
+
+                connection.Open();
+
+                dynamic jsonData = data;
+
+                string primaryKey = jsonData.primaryKey.ToString();
+                var idToken = jsonData.id;
+
+                var setClauses = new List<string>();
+
+                foreach (var property in ((JObject)data["fields"]).Properties())
+                {
+                    if (property.Name == primaryKey) continue; // skip PK in SET clause
+
+                    if (property.Value.Type == JTokenType.String)
+                        setClauses.Add($"{property.Name} = '{property.Value}'");
+                    else if (property.Value.Type == JTokenType.Integer || property.Value.Type == JTokenType.Float)
+                        setClauses.Add($"{property.Name} = {property.Value}");
+                    else if (property.Value.Type == JTokenType.Null)
+                        setClauses.Add($"{property.Name} = NULL");
+                }
+
+                string setStr = string.Join(", ", setClauses);
+                string sql = $"UPDATE {tablename} SET {setStr} WHERE {primaryKey} = @Id";
+
+                using (var command = new SqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", ((JToken)data["id"]).Value<int>());
+
+                    int rowsAffected = command.ExecuteNonQuery();
+                    if (rowsAffected > 0)
+                        return StatusCode(200);
+                    else
+                        return StatusCode(404);
                 }
             }
         }

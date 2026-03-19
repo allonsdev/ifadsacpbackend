@@ -216,7 +216,7 @@ namespace sacpapi.Controllers
                         //// Log the action
                         //auditTrail.Log("GeneralActivities", generalActivityId, "Create", null, JsonConvert.SerializeObject(model.GeneralActivity), username);
 
-                        return StatusCode(201);
+                        return StatusCode(201, new { id = generalActivityId });
                     }
                     catch (Exception ex)
                     {
