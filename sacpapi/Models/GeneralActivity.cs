@@ -27,5 +27,6 @@ namespace sacpapi.Models
         public DateTime CreatedDate { get; set; }
         public string UpdatedBy { get; set; } = string.Empty;
         public DateTime UpdatedDate { get; set; }
+        public string? OtherFacilitatorsText { get; set; }
     }
 }
