@@ -78,7 +78,10 @@ namespace sacpapi.Data
          public DbSet<vwBenefeciariesUnion> vwBenefeciariesUnion { get; set; }
         public DbSet<StakeholderParticipants> StakeholderParticipants { get; set; }
 
-    
+        public DbSet<WaterUser> WaterUsers { get; set; }
+        public DbSet<RoadUser> RoadUsers { get; set; }
+        public DbSet<SchoolBusinessUnit> SchoolBusinessUnits { get; set; }
+        public DbSet<EmploymentRecord> EmploymentRecords { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -104,6 +107,24 @@ namespace sacpapi.Data
                 entity.Property(e => e.Description)
                       .IsRequired();
             });
+
+
+            modelBuilder.Entity<RoadUser>()
+.HasIndex(r => r.NationalIdNumber)
+.IsUnique();
+
+            modelBuilder.Entity<SchoolBusinessUnit>()
+                .HasIndex(s => new { s.NameOfSchoolBusinessUnit, s.District })
+                .IsUnique();
+
+            modelBuilder.Entity<EmploymentRecord>()
+                .HasIndex(e => new { e.District, e.Gender, e.AgeGroup, e.DisabilityStatus })
+                .IsUnique();
+
+
+            modelBuilder.Entity<WaterUser>()
+    .HasIndex(w => w.HouseholdIdentifier)
+    .IsUnique();
 
             modelBuilder.Entity<StakeholderParticipants>(entity =>
             {

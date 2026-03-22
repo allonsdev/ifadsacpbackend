@@ -22,7 +22,13 @@ namespace sacpapi.Controllers
         {
             _context = context;
         }
-        
+
+        private string? Clean(string v) => string.IsNullOrWhiteSpace(v) ? null : v;
+
+        private int? TryParseInt(string v) => int.TryParse(v, out var i) ? i : null;
+
+        private decimal? TryParseDecimal(string v) => decimal.TryParse(v, out var d) ? d : null;
+
         #region GET Endpoints
 
 
@@ -85,10 +91,23 @@ namespace sacpapi.Controllers
             var failedList = new List<object>();
             int insertedCount = 0;
             int updatedCount = 0;
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "WaterUsers");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
 
+            // Generate unique file name to avoid overwrite
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
             using (var stream = new MemoryStream())
             {
                 await file.CopyToAsync(stream);
+                ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+
                 using (var package = new ExcelPackage(stream))
                 {
                     var worksheet = package.Workbook.Worksheets.FirstOrDefault();
@@ -241,7 +260,7 @@ namespace sacpapi.Controllers
                 failedRecords = failedList
             });
         }
-    
+
         #region MSE Upload
 
         [HttpPost("MseExcelUpload")]
@@ -254,10 +273,23 @@ namespace sacpapi.Controllers
             var failedList = new List<object>();
             int insertedCount = 0;
             int updatedCount = 0;
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "WaterUsers");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
 
+            // Generate unique file name to avoid overwrite
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
             using (var stream = new MemoryStream())
             {
                 await file.CopyToAsync(stream);
+                ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+
                 using (var package = new ExcelPackage(stream))
                 {
                     var worksheet = package.Workbook.Worksheets.FirstOrDefault();
@@ -416,7 +448,537 @@ namespace sacpapi.Controllers
 
         #endregion
 
-    
+
+        [HttpPost("WaterUsersExcelUpload")]
+        public async Task<IActionResult> UploadExcelWaterUsers(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var list = new List<WaterUser>();
+            var failedList = new List<object>();
+            int insertedCount = 0;
+            int updatedCount = 0;
+
+
+            // 1️⃣ Save a copy
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "WaterUsers");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            // Generate unique file name to avoid overwrite
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            using (var stream = new MemoryStream())
+            {
+                await file.CopyToAsync(stream);
+
+
+                ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+
+                using (var package = new ExcelPackage(stream))
+                {
+                    var worksheet = package.Workbook.Worksheets.FirstOrDefault();
+                    if (worksheet == null)
+                        return BadRequest("No worksheet found.");
+
+                    int rowCount = worksheet.Dimension.Rows;
+                    int colCount = worksheet.Dimension.Columns;
+
+                    // ✅ Header Mapping
+                    var headers = new Dictionary<int, string>();
+                    for (int col = 1; col <= colCount; col++)
+                    {
+                        var header = worksheet.Cells[1, col].Value?.ToString()?.Trim();
+                        if (!string.IsNullOrEmpty(header))
+                            headers[col] = header;
+                    }
+
+                    // ✅ Process Rows
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        var item = new WaterUser();
+
+                        foreach (var kvp in headers)
+                        {
+                            int col = kvp.Key;
+                            string header = kvp.Value;
+                            string value = worksheet.Cells[row, col].Value?.ToString()?.Trim();
+
+                            try
+                            {
+                                switch (header)
+                                {
+                                    case "Province": item.Province = Clean(value); break;
+                                    case "District": item.District = Clean(value); break;
+                                    case "Ward": item.Ward = Clean(value); break;
+
+                                    case "NameOfTheWaterPoint": item.NameOfTheWaterPoint = Clean(value); break;
+
+                                    case "FirstNameOfHhh": item.FirstNameOfHhh = Clean(value); break;
+                                    case "SurnameOfHhh": item.SurnameOfHhh = Clean(value); break;
+
+                                    case "HouseholdIdentifier": item.HouseholdIdentifier = Clean(value); break;
+
+                                    case "Gender": item.Gender = Clean(value); break;
+                                    case "Yob": item.Yob = TryParseInt(value); break;
+
+                                    case "AgeStatus": item.AgeStatus = Clean(value); break;
+                                    case "ContactNumber": item.ContactNumber = Clean(value); break;
+
+                                    case "GenderOfHhh": item.GenderOfHhh = Clean(value); break;
+                                    case "PwdStatus": item.PwdStatus = Clean(value); break;
+
+                                    case "FamilySize": item.FamilySize = TryParseInt(value); break;
+                                    case "Male": item.Male = TryParseInt(value); break;
+                                    case "Female": item.Female = TryParseInt(value); break;
+
+                                    case "NumberOfLivestockOwnedAccessingTheWaterPoint":
+                                        item.NumberOfLivestockOwnedAccessingTheWaterPoint = TryParseInt(value);
+                                        break;
+                                }
+                            }
+                            catch
+                            {
+                                // ignore parse errors, log later
+                            }
+                        }
+
+                        // ❌ Skip bad rows
+                        if (string.IsNullOrEmpty(item.HouseholdIdentifier))
+                        {
+                            failedList.Add(new { Row = row, Reason = "Missing HouseholdIdentifier" });
+                            continue;
+                        }
+
+                        try
+                        {
+                            // ✅ UPSERT LOGIC (based on your constraint)
+                            var existing = _context.WaterUsers.FirstOrDefault(x =>
+                                x.HouseholdIdentifier == item.HouseholdIdentifier &&
+                                x.NameOfTheWaterPoint == item.NameOfTheWaterPoint
+                            );
+
+                            if (existing != null)
+                            {
+                                // UPDATE
+                                existing.Province = item.Province;
+                                existing.District = item.District;
+                                existing.Ward = item.Ward;
+                                existing.FirstNameOfHhh = item.FirstNameOfHhh;
+                                existing.SurnameOfHhh = item.SurnameOfHhh;
+                                existing.Gender = item.Gender;
+                                existing.Yob = item.Yob;
+                                existing.AgeStatus = item.AgeStatus;
+                                existing.ContactNumber = item.ContactNumber;
+                                existing.GenderOfHhh = item.GenderOfHhh;
+                                existing.PwdStatus = item.PwdStatus;
+                                existing.FamilySize = item.FamilySize;
+                                existing.Male = item.Male;
+                                existing.Female = item.Female;
+                                existing.NumberOfLivestockOwnedAccessingTheWaterPoint =
+                                    item.NumberOfLivestockOwnedAccessingTheWaterPoint;
+
+                                updatedCount++;
+                            }
+                            else
+                            {
+                                item.CreatedAt = DateTime.Now;
+                                _context.WaterUsers.Add(item);
+                                insertedCount++;
+                            }
+
+                            list.Add(item);
+                        }
+                        catch
+                        {
+                            failedList.Add(new
+                            {
+                                Row = row,
+                                item.HouseholdIdentifier,
+                                item.NameOfTheWaterPoint
+                            });
+                        }
+                    }
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                foreach (var item in list)
+                {
+                    failedList.Add(new
+                    {
+                        item.HouseholdIdentifier,
+                        item.NameOfTheWaterPoint
+                    });
+                }
+            }
+
+            return Ok(new
+            {
+                message = "Excel processed",
+                totalRecords = list.Count + failedList.Count,
+                inserted = insertedCount,
+                updated = updatedCount,
+                failed = failedList.Count,
+                failedRecords = failedList
+            });
+        }
+
+
+
+
+
+        [HttpGet("wateruser")]
+        public async Task<IActionResult> GetAllWaterUsers()
+        {
+            var waterUsers = await _context.WaterUsers.OrderByDescending(x => x.CreatedAt).ToListAsync();
+            return Ok(waterUsers);
+        }
+
+        [HttpGet("sbu")]
+        public async Task<IActionResult> GetAllSBU()
+        {
+            var sbus = await _context.SchoolBusinessUnits.OrderByDescending(x => x.CreatedAt).ToListAsync();
+            return Ok(sbus);
+        }
+
+
+        [HttpGet("roaduser")]
+        public async Task<IActionResult> GetAllRoadUsers()
+        {
+            var roadUsers = await _context.RoadUsers.OrderByDescending(x => x.CreatedAt).ToListAsync();
+            return Ok(roadUsers);
+        }
+
+        [HttpGet("employee")]
+        public async Task<IActionResult> GetAllEmploymentRecords()
+        {
+            var records = await _context.EmploymentRecords.OrderByDescending(x => x.CreatedAt).ToListAsync();
+            return Ok(records);
+        }
+
+        [HttpPost("RoadUsersExcelUpload")]
+        public async Task<IActionResult> UploadExcelRoadUsers(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var list = new List<RoadUser>();
+            var failedList = new List<object>();
+            int inserted = 0, updated = 0;
+
+
+            // 1️⃣ Save a copy
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "RoadUser");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            // Generate unique file name to avoid overwrite
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+            using (var stream = new MemoryStream())
+            {
+                await file.CopyToAsync(stream);
+                ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+
+                using (var package = new ExcelPackage(stream))
+                {
+                    var ws = package.Workbook.Worksheets.FirstOrDefault();
+                    if (ws == null) return BadRequest("No worksheet.");
+
+                    int rows = ws.Dimension.Rows;
+                    int cols = ws.Dimension.Columns;
+
+                    var headers = new Dictionary<int, string>();
+                    for (int c = 1; c <= cols; c++)
+                    {
+                        var h = ws.Cells[1, c].Text.Trim();
+                        if (!string.IsNullOrEmpty(h)) headers[c] = h;
+                    }
+
+                    for (int r = 2; r <= rows; r++)
+                    {
+                        var item = new RoadUser();
+
+                        foreach (var h in headers)
+                        {
+                            var val = ws.Cells[r, h.Key].Text.Trim();
+
+                            switch (h.Value)
+                            {
+                                case "Province": item.Province = Clean(val); break;
+                                case "District": item.District = Clean(val); break;
+                                case "Ward": item.Ward = Clean(val); break;
+                                case "FirstName": item.FirstName = Clean(val); break;
+                                case "Surname": item.Surname = Clean(val); break;
+                                case "NationalIdNumber": item.NationalIdNumber = Clean(val); break;
+                                case "GenderOfHhh": item.GenderOfHhh = Clean(val); break;
+                                case "Yob": item.Yob = TryParseInt(val); break;
+                                case "YouthStatus": item.YouthStatus = Clean(val); break;
+                                case "MaritalStatus": item.MaritalStatus = Clean(val); break;
+                                case "PwdStatus": item.PwdStatus = Clean(val); break;
+                                case "NumberOfHouseholdMembers": item.NumberOfHouseholdMembers = TryParseInt(val); break;
+                                case "Male": item.Male = TryParseInt(val); break;
+                                case "Female": item.Female = TryParseInt(val); break;
+                                case "NameOfPlaceWhereTheRoadWasRehabilitated": item.NameOfPlaceWhereTheRoadWasRehabilitated = Clean(val); break;
+                                case "ContactNumber": item.ContactNumber = Clean(val); break;
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(item.NationalIdNumber))
+                        {
+                            failedList.Add(new { Row = r, Reason = "Missing NationalIdNumber" });
+                            continue;
+                        }
+
+                        var existing = _context.RoadUsers
+                            .FirstOrDefault(x => x.NationalIdNumber == item.NationalIdNumber);
+
+                        if (existing != null)
+                        {
+                            // UPDATE
+                            existing.Province = item.Province;
+                            existing.District = item.District;
+                            existing.Ward = item.Ward;
+                            existing.FirstName = item.FirstName;
+                            existing.Surname = item.Surname;
+                            existing.GenderOfHhh = item.GenderOfHhh;
+                            existing.Yob = item.Yob;
+                            existing.YouthStatus = item.YouthStatus;
+                            existing.MaritalStatus = item.MaritalStatus;
+                            existing.PwdStatus = item.PwdStatus;
+                            existing.NumberOfHouseholdMembers = item.NumberOfHouseholdMembers;
+                            existing.Male = item.Male;
+                            existing.Female = item.Female;
+                            existing.NameOfPlaceWhereTheRoadWasRehabilitated = item.NameOfPlaceWhereTheRoadWasRehabilitated;
+                            existing.ContactNumber = item.ContactNumber;
+
+                            updated++;
+                        }
+                        else
+                        {
+                            item.CreatedAt = DateTime.Now;
+                            _context.RoadUsers.Add(item);
+                            inserted++;
+                        }
+
+                        list.Add(item);
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { inserted, updated, failed = failedList.Count, failedList });
+        }
+
+        [HttpPost("SBUExcelUpload")]
+        public async Task<IActionResult> UploadExcelSBU(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var list = new List<SchoolBusinessUnit>();
+            var failed = new List<object>();
+            int inserted = 0, updated = 0;
+
+            // 1️⃣ Save a copy
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "SBU");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            // Generate unique file name to avoid overwrite
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var streams = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(streams);
+            }
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+
+            ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+            using var package = new ExcelPackage(stream);
+            var ws = package.Workbook.Worksheets.FirstOrDefault();
+
+            int rows = ws.Dimension.Rows;
+            int cols = ws.Dimension.Columns;
+
+            var headers = new Dictionary<int, string>();
+            for (int c = 1; c <= cols; c++)
+                headers[c] = ws.Cells[1, c].Text.Trim();
+
+            for (int r = 2; r <= rows; r++)
+            {
+                var item = new SchoolBusinessUnit();
+
+                foreach (var h in headers)
+                {
+                    var val = ws.Cells[r, h.Key].Text.Trim();
+
+                    switch (h.Value)
+                    {
+                        case "Province": item.Province = Clean(val); break;
+                        case "District": item.District = Clean(val); break;
+                        case "Ward": item.Ward = Clean(val); break;
+                        case "NameOfSchoolBusinessUnit": item.NameOfSchoolBusinessUnit = Clean(val); break;
+                        case "NumberOfFemaleStudents": item.NumberOfFemaleStudents = TryParseInt(val); break;
+                        case "NumberOfMaleStudents": item.NumberOfMaleStudents = TryParseInt(val); break;
+                        case "NameOfSchoolHead": item.NameOfSchoolHead = Clean(val); break;
+                        case "ContactNumberOfTheSchoolHead": item.ContactNumberOfTheSchoolHead = Clean(val); break;
+                        case "Latitude": item.Latitude = TryParseDecimal(val); break;
+                        case "Longitude": item.Longitude = TryParseDecimal(val); break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(item.NameOfSchoolBusinessUnit) || string.IsNullOrEmpty(item.District))
+                {
+                    failed.Add(new { Row = r });
+                    continue;
+                }
+
+                var existing = _context.SchoolBusinessUnits.FirstOrDefault(x =>
+                    x.NameOfSchoolBusinessUnit == item.NameOfSchoolBusinessUnit &&
+                    x.District == item.District);
+
+                if (existing != null)
+                {
+                    existing.Province = item.Province;
+                    existing.Ward = item.Ward;
+                    existing.NumberOfFemaleStudents = item.NumberOfFemaleStudents;
+                    existing.NumberOfMaleStudents = item.NumberOfMaleStudents;
+                    existing.NameOfSchoolHead = item.NameOfSchoolHead;
+                    existing.ContactNumberOfTheSchoolHead = item.ContactNumberOfTheSchoolHead;
+                    existing.Latitude = item.Latitude;
+                    existing.Longitude = item.Longitude;
+
+                    updated++;
+                }
+                else
+                {
+                    item.CreatedAt = DateTime.Now;
+                    _context.SchoolBusinessUnits.Add(item);
+                    inserted++;
+                }
+
+                list.Add(item);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { inserted, updated, failed = failed.Count });
+        }
+
+        [HttpPost("EmploymentExcelUpload")]
+        public async Task<IActionResult> UploadExcelEmployment(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var list = new List<EmploymentRecord>();
+            var failed = new List<object>();
+            int inserted = 0, updated = 0;
+
+
+            // 1️⃣ Save a copy
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "Employee");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            // Generate unique file name to avoid overwrite
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var streams = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(streams);
+            }
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+            ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+
+            using var package = new ExcelPackage(stream);
+            var ws = package.Workbook.Worksheets.FirstOrDefault();
+
+            int rows = ws.Dimension.Rows;
+            int cols = ws.Dimension.Columns;
+
+            var headers = new Dictionary<int, string>();
+            for (int c = 1; c <= cols; c++)
+                headers[c] = ws.Cells[1, c].Text.Trim();
+
+            for (int r = 2; r <= rows; r++)
+            {
+                var item = new EmploymentRecord();
+
+                foreach (var h in headers)
+                {
+                    var val = ws.Cells[r, h.Key].Text.Trim();
+
+                    switch (h.Value)
+                    {
+                        case "District": item.District = Clean(val); break;
+                        case "Gender": item.Gender = Clean(val); break;
+                        case "AgeGroup": item.AgeGroup = Clean(val); break;
+                        case "DisabilityStatus": item.DisabilityStatus = Clean(val); break;
+                        case "PwdMale": item.PwdMale = TryParseInt(val); break;
+                        case "PwdFemale": item.PwdFemale = TryParseInt(val); break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(item.District) || string.IsNullOrEmpty(item.Gender))
+                {
+                    failed.Add(new { Row = r });
+                    continue;
+                }
+
+                var existing = _context.EmploymentRecords.FirstOrDefault(x =>
+                    x.District == item.District &&
+                    x.Gender == item.Gender &&
+                    x.AgeGroup == item.AgeGroup &&
+                    x.DisabilityStatus == item.DisabilityStatus);
+
+                if (existing != null)
+                {
+                    existing.PwdMale = item.PwdMale;
+                    existing.PwdFemale = item.PwdFemale;
+                    updated++;
+                }
+                else
+                {
+                    item.CreatedAt = DateTime.Now;
+                    _context.EmploymentRecords.Add(item);
+                    inserted++;
+                }
+
+                list.Add(item);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { inserted, updated, failed = failed.Count });
+        }
+
+
+
 
         #region Beneficiary Upload
 
@@ -456,6 +1018,8 @@ namespace sacpapi.Controllers
                 await file.CopyToAsync(stream);
                 using (var package = new ExcelPackage(stream))
                 {
+                    ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
+
                     ExcelWorksheet worksheet = package.Workbook.Worksheets.FirstOrDefault();
                     if (worksheet == null)
                         return BadRequest("No worksheet found in the uploaded file.");
