@@ -271,6 +271,7 @@ namespace sacpapi.Controllers
                         existingGeneralActivity.CreatedDate = generalActivity.CreatedDate;
                         existingGeneralActivity.UpdatedBy = generalActivity.UpdatedBy;
                         existingGeneralActivity.UpdatedDate = generalActivity.UpdatedDate;
+                        existingGeneralActivity.OtherFacilitatorsText = generalActivity.OtherFacilitatorsText;
 
                         var existingFacilitator = _context.Facilitators.Where(f => f.GeneralActivityId == id).ToList();
                         _context.Facilitators.RemoveRange(existingFacilitator);
