@@ -13,7 +13,7 @@ namespace sacpapi.Models
         public int ActivityTypeId { get; set; }
         public int ActivityId { get; set; }
         public int ActiveStatusId { get; set; }
-        public int DistrictId { get; set; }
+        public int? DistrictId { get; set; }
         public string Site { get; set; } = string.Empty;
         public string SiteType { get; set; } = string.Empty;
         public int WaterpointId { get; set; }
