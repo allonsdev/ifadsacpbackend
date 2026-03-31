@@ -82,6 +82,7 @@ namespace sacpapi.Data
         public DbSet<RoadUser> RoadUsers { get; set; }
         public DbSet<SchoolBusinessUnit> SchoolBusinessUnits { get; set; }
         public DbSet<EmploymentRecord> EmploymentRecords { get; set; }
+        public DbSet<IrrigationSchemesDatabase> IrrigationScheme { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -107,8 +108,78 @@ namespace sacpapi.Data
                 entity.Property(e => e.Description)
                       .IsRequired();
             });
+            modelBuilder.Entity<IrrigationSchemesDatabase>(entity =>
+            {
+                entity.ToTable("tblrrigationSchemesDatabase");
 
+                entity.HasKey(e => e.Id);
 
+                entity.Property(e => e.Id)
+                      .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.Province)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.District)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.Ward)
+                      .HasMaxLength(50);
+
+                entity.Property(e => e.IrrigationScheme)
+                      .HasMaxLength(150);
+
+                entity.Property(e => e.FirstName)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.Surname)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.HouseholdIdentifier)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.GenderOfRegisteredPerson)
+                      .HasMaxLength(10);
+
+                entity.Property(e => e.YearOfBirth);
+
+                entity.Property(e => e.YouthStatus)
+                      .HasMaxLength(50);
+
+                entity.Property(e => e.MaritalStatus)
+                      .HasMaxLength(50);
+
+                entity.Property(e => e.ContactNumber)
+                      .HasMaxLength(20);
+
+                entity.Property(e => e.GenderOfHouseholdHead)
+                      .HasMaxLength(10);
+
+                entity.Property(e => e.PwD)
+                      .HasMaxLength(20);
+
+                entity.Property(e => e.FamilySize);
+
+                entity.Property(e => e.Male);
+
+                entity.Property(e => e.Female);
+
+                entity.Property(e => e.ImcPosition)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.LeadershipPosition)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.NameOfChairperson)
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.ContactNumberOfChairperson)
+                      .HasMaxLength(20);
+
+                // ✅ Unique index on HouseholdIdentifier
+                entity.HasIndex(e => e.HouseholdIdentifier)
+                      .IsUnique();
+            });
             modelBuilder.Entity<RoadUser>()
 .HasIndex(r => r.NationalIdNumber)
 .IsUnique();
@@ -118,8 +189,8 @@ namespace sacpapi.Data
                 .IsUnique();
 
             modelBuilder.Entity<EmploymentRecord>()
-                .HasIndex(e => new { e.District, e.Gender, e.AgeGroup, e.DisabilityStatus })
-                .IsUnique();
+       .HasIndex(e => new { e.Province, e.District, e.Ward, e.Gender, e.Yob, e.PwDStatus })
+       .IsUnique();
 
 
             modelBuilder.Entity<WaterUser>()
