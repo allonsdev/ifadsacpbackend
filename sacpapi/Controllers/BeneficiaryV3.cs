@@ -29,6 +29,37 @@ namespace sacpapi.Controllers
 
         private decimal? TryParseDecimal(string v) => decimal.TryParse(v, out var d) ? d : null;
 
+       
+
+        private double? TryParseDouble(string val)
+        {
+            return double.TryParse(val, out double result) ? result : null;
+        }
+
+        private DateTime? TryParseDate(string val)
+        {
+            return DateTime.TryParse(val, out DateTime result) ? result : null;
+        }
+
+
+
+
+    
+
+        private int? ParseInt(string value)
+        {
+            return int.TryParse(value, out var result) ? result : null;
+        }
+
+        private bool IsValidName(string name)
+        {
+            return System.Text.RegularExpressions.Regex.IsMatch(name, @"^[A-Za-z]+$");
+        }
+
+        private bool IsValidGender(string gender)
+        {
+            return gender == "Male" || gender == "Female";
+        }
         #region GET Endpoints
 
 
@@ -887,40 +918,195 @@ namespace sacpapi.Controllers
             return Ok(new { inserted, updated, failed = failed.Count });
         }
 
+
+
+        [HttpGet("irrigation")]
+
+        [HttpGet("irrigation")]
+        public async Task<IActionResult> GetAllIrrigationSchemes()
+        {
+            var data = await _context.IrrigationScheme
+                .OrderByDescending(x => x.Id)
+                .ToListAsync();
+
+            return Ok(data);
+        }
+
+
+        [HttpPost("IrrigationExcelUpload")]
+        public async Task<IActionResult> UploadExcelIrrigation(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var failed = new List<object>();
+            int inserted = 0, updated = 0;
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "Irrigation");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var streams = new FileStream(filePath, FileMode.Create))
+                await file.CopyToAsync(streams);
+
+            using var stream = new MemoryStream();
+            await file.CopyToAsync(stream);
+
+            ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani");
+
+            using var package = new ExcelPackage(stream);
+            var ws = package.Workbook.Worksheets.FirstOrDefault();
+
+            if (ws == null)
+                return BadRequest("Invalid Excel file.");
+
+            int rows = ws.Dimension.Rows;
+            int cols = ws.Dimension.Columns;
+
+            var headers = new Dictionary<int, string>();
+            for (int c = 1; c <= cols; c++)
+                headers[c] = ws.Cells[1, c].Text.Trim();
+
+            // 🔥 Load existing records once (performance)
+            var existingData = await _context.IrrigationScheme.ToListAsync();
+
+            for (int r = 2; r <= rows; r++)
+            {
+                var item = new IrrigationSchemesDatabase();
+
+                foreach (var h in headers)
+                {
+                    var val = ws.Cells[r, h.Key].Text.Trim();
+
+                    switch (h.Value)
+                    {
+                        case "Province": item.Province = Clean(val); break;
+                        case "District": item.District = Clean(val); break;
+                        case "Ward": item.Ward = Clean(val); break;
+                        case "IrrigationScheme": item.IrrigationScheme = Clean(val); break;
+
+                        case "FirstName": item.FirstName = Clean(val); break;
+                        case "Surname": item.Surname = Clean(val); break;
+
+                        case "HouseholdIdentifier": item.HouseholdIdentifier = Clean(val); break;
+
+                        case "GenderOfRegisteredPerson": item.GenderOfRegisteredPerson = val; break;
+                        case "YearOfBirth": item.YearOfBirth = ParseInt(val); break;
+
+                        case "YouthStatus": item.YouthStatus = val; break;
+                        case "MaritalStatus": item.MaritalStatus = val; break;
+
+                        case "ContactNumber": item.ContactNumber = Clean(val); break;
+
+                        case "GenderOfHouseholdHead": item.GenderOfHouseholdHead = val; break;
+
+                        case "PwD": item.PwD = val; break;
+                        case "FamilySize": item.FamilySize = ParseInt(val); break;
+
+                        case "Male": item.Male = ParseInt(val); break;
+                        case "Female": item.Female = ParseInt(val); break;
+
+                        case "ImcPosition": item.ImcPosition = Clean(val); break;
+                        case "LeadershipPosition": item.LeadershipPosition = Clean(val); break;
+
+                        case "NameOfChairperson": item.NameOfChairperson = Clean(val); break;
+                        case "ContactNumberOfChairperson": item.ContactNumberOfChairperson = Clean(val); break;
+                    }
+                }
+
+                // ✅ VALIDATION
+                if (string.IsNullOrEmpty(item.FirstName) ||
+                    string.IsNullOrEmpty(item.Surname) ||
+                    !IsValidName(item.FirstName) ||
+                    !IsValidName(item.Surname) ||
+                    !IsValidGender(item.GenderOfRegisteredPerson))
+                {
+                    failed.Add(new { Row = r, Reason = "Validation failed" });
+                    continue;
+                }
+
+                // ✅ MULTI-FIELD DUPLICATE CHECK
+                var existing = existingData.FirstOrDefault(x =>
+                    x.FirstName == item.FirstName &&
+                    x.Surname == item.Surname &&
+                    x.ContactNumber == item.ContactNumber &&
+                    x.IrrigationScheme == item.IrrigationScheme
+                );
+
+                if (existing != null)
+                {
+                    // 🔄 UPDATE
+                    existing.Province = item.Province;
+                    existing.District = item.District;
+                    existing.Ward = item.Ward;
+                    existing.YearOfBirth = item.YearOfBirth;
+                    existing.YouthStatus = item.YouthStatus;
+                    existing.MaritalStatus = item.MaritalStatus;
+                    existing.GenderOfHouseholdHead = item.GenderOfHouseholdHead;
+                    existing.PwD = item.PwD;
+                    existing.FamilySize = item.FamilySize;
+                    existing.Male = item.Male;
+                    existing.Female = item.Female;
+                    existing.ImcPosition = item.ImcPosition;
+                    existing.LeadershipPosition = item.LeadershipPosition;
+                    existing.NameOfChairperson = item.NameOfChairperson;
+                    existing.ContactNumberOfChairperson = item.ContactNumberOfChairperson;
+
+                    updated++;
+                }
+                else
+                {
+                    _context.IrrigationScheme.Add(item);
+                    inserted++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { inserted, updated, failed = failed.Count });
+        }
+
+
         [HttpPost("EmploymentExcelUpload")]
         public async Task<IActionResult> UploadExcelEmployment(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            var list = new List<EmploymentRecord>();
+            var inserted = 0;
+            var updated = 0;
             var failed = new List<object>();
-            int inserted = 0, updated = 0;
+            var list = new List<EmploymentRecord>();
 
-
-            // 1️⃣ Save a copy
+            // 1️⃣ Save uploaded file
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedFiles", "Employee");
             if (!Directory.Exists(uploadsFolder))
                 Directory.CreateDirectory(uploadsFolder);
 
-            // Generate unique file name to avoid overwrite
             var fileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(file.FileName)}";
             var filePath = Path.Combine(uploadsFolder, fileName);
 
-            using (var streams = new FileStream(filePath, FileMode.Create))
+            using (var streamFile = new FileStream(filePath, FileMode.Create))
             {
-                await file.CopyToAsync(streams);
+                await file.CopyToAsync(streamFile);
             }
+
             using var stream = new MemoryStream();
             await file.CopyToAsync(stream);
-            ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani"); // your license name
 
+            ExcelPackage.License.SetNonCommercialPersonal("Tafadzwa Mazani");
             using var package = new ExcelPackage(stream);
             var ws = package.Workbook.Worksheets.FirstOrDefault();
+            if (ws == null)
+                return BadRequest("No worksheet found in the Excel file.");
 
             int rows = ws.Dimension.Rows;
             int cols = ws.Dimension.Columns;
 
+            // Map headers
             var headers = new Dictionary<int, string>();
             for (int c = 1; c <= cols; c++)
                 headers[c] = ws.Cells[1, c].Text.Trim();
@@ -935,36 +1121,75 @@ namespace sacpapi.Controllers
 
                     switch (h.Value)
                     {
+                        case "Province": item.Province = Clean(val); break;
                         case "District": item.District = Clean(val); break;
-                        case "Gender": item.Gender = Clean(val); break;
-                        case "AgeGroup": item.AgeGroup = Clean(val); break;
-                        case "DisabilityStatus": item.DisabilityStatus = Clean(val); break;
-                        case "PwdMale": item.PwdMale = TryParseInt(val); break;
-                        case "PwdFemale": item.PwdFemale = TryParseInt(val); break;
+                        case "Ward": item.Ward = Clean(val); break;
+                        case "NameOfVillage": item.NameOfVillage = Clean(val); break;
+                        case "FirstName": item.FirstName = Clean(val); break;
+                        case "Surname": item.Surname = Clean(val); break;
+                        case "NationalIdNumber": item.NationalIdNumber = val; break;
+                        case "Gender": item.Gender = val; break;
+                        case "Yob": item.Yob = TryParseInt(val); break;
+                        case "YouthStatus": item.YouthStatus = Clean(val); break;
+                        case "MaritalStatus": item.MaritalStatus = Clean(val); break;
+                        case "ContactNumber": item.ContactNumber = Clean(val); break;
+                        case "GenderOfHhh": item.GenderOfHhh = val; break;
+                        case "PwDStatus": item.PwDStatus = Clean(val); break;
+                        case "FamilySize": item.FamilySize = TryParseInt(val); break;
+                        case "Male": item.Male = TryParseInt(val); break;
+                        case "Female": item.Female = TryParseInt(val); break;
+                        case "Employer": item.Employer = Clean(val); break;
+                        case "TypeOfEmployment": item.TypeOfEmployment = Clean(val); break;
+                        case "DurationOfEmploymentWorkContract": item.DurationOfEmploymentWorkContract = Clean(val); break;
+                        case "MainServiceRendered": item.MainServiceRendered = Clean(val); break;
+                        case "Designation": item.Designation = Clean(val); break;
+                        case "AnnualIncomeUsd": item.AnnualIncomeUsd = TryParseDecimal(val); break;
+                        case "HaveYouReceivedAnyTrainingFromSacp": item.HaveYouReceivedAnyTrainingFromSacp = Clean(val); break;
+                        case "SpecifyTrainingMostBeneficial": item.SpecifyTrainingMostBeneficial = Clean(val); break;
                     }
                 }
 
-                if (string.IsNullOrEmpty(item.District) || string.IsNullOrEmpty(item.Gender))
+                // Minimal validation: required fields
+                if (string.IsNullOrEmpty(item.FirstName) || string.IsNullOrEmpty(item.Surname) || string.IsNullOrEmpty(item.NationalIdNumber) || string.IsNullOrEmpty(item.Gender))
                 {
                     failed.Add(new { Row = r });
                     continue;
                 }
 
-                var existing = _context.EmploymentRecords.FirstOrDefault(x =>
-                    x.District == item.District &&
-                    x.Gender == item.Gender &&
-                    x.AgeGroup == item.AgeGroup &&
-                    x.DisabilityStatus == item.DisabilityStatus);
-
+                // Check if record exists by NationalIdNumber (unique)
+                var existing = _context.EmploymentRecords.FirstOrDefault(x => x.NationalIdNumber == item.NationalIdNumber);
                 if (existing != null)
                 {
-                    existing.PwdMale = item.PwdMale;
-                    existing.PwdFemale = item.PwdFemale;
+                    // Update existing record
+                    existing.Province = item.Province;
+                    existing.District = item.District;
+                    existing.Ward = item.Ward;
+                    existing.NameOfVillage = item.NameOfVillage;
+                    existing.FirstName = item.FirstName;
+                    existing.Surname = item.Surname;
+                    existing.Gender = item.Gender;
+                    existing.Yob = item.Yob;
+                    existing.YouthStatus = item.YouthStatus;
+                    existing.MaritalStatus = item.MaritalStatus;
+                    existing.ContactNumber = item.ContactNumber;
+                    existing.GenderOfHhh = item.GenderOfHhh;
+                    existing.PwDStatus = item.PwDStatus;
+                    existing.FamilySize = item.FamilySize;
+                    existing.Male = item.Male;
+                    existing.Female = item.Female;
+                    existing.Employer = item.Employer;
+                    existing.TypeOfEmployment = item.TypeOfEmployment;
+                    existing.DurationOfEmploymentWorkContract = item.DurationOfEmploymentWorkContract;
+                    existing.MainServiceRendered = item.MainServiceRendered;
+                    existing.Designation = item.Designation;
+                    existing.AnnualIncomeUsd = item.AnnualIncomeUsd;
+                    existing.HaveYouReceivedAnyTrainingFromSacp = item.HaveYouReceivedAnyTrainingFromSacp;
+                    existing.SpecifyTrainingMostBeneficial = item.SpecifyTrainingMostBeneficial;
                     updated++;
                 }
                 else
                 {
-                    item.CreatedAt = DateTime.Now;
+                    item.CreatedAt = DateTime.UtcNow;
                     _context.EmploymentRecords.Add(item);
                     inserted++;
                 }
@@ -977,7 +1202,7 @@ namespace sacpapi.Controllers
             return Ok(new { inserted, updated, failed = failed.Count });
         }
 
-
+        // Helper methods
 
 
         #region Beneficiary Upload
